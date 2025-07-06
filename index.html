@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Trivia Annihilator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'VT323', monospace;
+            background-color: #0a0a0a;
+            color: #00ff41;
+            text-shadow: 0 0 5px #00ff41, 0 0 10px #00ff41;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .crt-overlay::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            animation: flicker 0.15s infinite;
+        }
+        @keyframes flicker {
+            0% { opacity: 0.2; }
+            20% { opacity: 1; }
+            40% { opacity: 0.3; }
+            60% { opacity: 1; }
+            80% { opacity: 0.2; }
+            100% { opacity: 1; }
+        }
+        .game-container {
+            background-color: #141414;
+            border: 4px solid #00ff41;
+            box-shadow: 0 0 20px #00ff41, inset 0 0 15px rgba(0, 255, 65, 0.3);
+            padding: 2rem;
+            width: 95%;
+            max-width: 800px;
+            position: relative;
+        }
+        .btn {
+            background-color: transparent;
+            border: 2px solid #00ff41;
+            color: #00ff41;
+            padding: 10px 20px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            font-size: 1.2rem;
+        }
+        .btn:hover {
+            background-color: #00ff41;
+            color: #141414;
+            text-shadow: none;
+        }
+        .btn:disabled {
+            border-color: #005215;
+            color: #005215;
+            cursor: not-allowed;
+            text-shadow: none;
+        }
+        .answer-btn.correct {
+            background-color: #00ff41;
+            color: #141414;
+            text-shadow: none;
+            animation: correct-pulse 0.5s;
+        }
+        .answer-btn.incorrect {
+            background-color: #ff0000;
+            border-color: #ff0000;
+            color: #141414;
+            text-shadow: none;
+            animation: incorrect-shake 0.5s;
+        }
+        @keyframes correct-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        @keyframes incorrect-shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+        .hidden {
+            display: none;
+        }
+        .xp-bar {
+            width: 100%;
+            background: #222;
+            height: 20px;
+            border: 1px solid #00ff41;
+            margin-top: 10px;
+            margin-bottom: 10px;
+            position: relative;
+        }
+        .xp-bar-inner {
+            background: linear-gradient(90deg, #00ff41 0%, #21d4fd 100%);
+            height: 100%;
+            transition: width 0.3s;
+        }
+        .player-name {
+            color: #21d4fd;
+            text-shadow: 0 0 5px #21d4fd, 0 0 10px #21d4fd;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container crt-overlay">
+        <!-- Start Screen -->
+        <div id="start-screen" class="text-center space-y-6">
+            <h1 class="text-5xl md:text-7xl font-bold">TRIVIA ANNIHILATOR</h1>
+            <p class="text-xl md:text-2xl">Enter your name and prepare to accumulate <span class="font-bold">TRIVIA POWER</span>.<br>
+                <span class="text-green-400">Reach 50,000+ to become a <span class="font-bold">Retro Master</span>!</span>
+            </p>
+            <input id="name-input" type="text" maxlength="20" placeholder="Enter your name" class="mb-2 px-4 py-2 text-xl text-black rounded w-60 text-center"/>
+            <br>
+            <button id="start-btn" class="btn">Initiate Distraction</button>
+        </div>
+
+        <!-- Category Selection Screen -->
+        <div id="category-screen" class="hidden">
+            <h2 class="text-3xl md:text-4xl text-center mb-4">Round <span id="round-number"></span>: Choose Your Poison</h2>
+            <p id="category-commentary" class="text-center text-lg mb-6"></p>
+            <div id="category-buttons" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Category buttons will be injected here -->
+            </div>
+        </div>
+
+        <!-- Question Screen -->
+        <div id="question-screen" class="hidden space-y-6">
+            <div class="flex justify-between items-center text-xl">
+                <span id="question-category"></span>
+                <span>
+                    <span class="player-name" id="player-name-question"></span>
+                    <span class="ml-2">TRIVIA POWER: <span id="score">0</span></span>
+                </span>
+            </div>
+            <div class="xp-bar">
+                <div id="xp-bar-inner" class="xp-bar-inner" style="width: 0%"></div>
+            </div>
+            <h2 class="text-2xl md:text-3xl" id="question-text"></h2>
+            <div id="answer-buttons" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Answer buttons will be injected here -->
+            </div>
+            <div class="text-center text-lg h-8" id="feedback-text"></div>
+        </div>
+        
+        <!-- Round Over Screen -->
+        <div id="round-over-screen" class="hidden text-center space-y-6">
+            <h2 class="text-4xl md:text-5xl">Round Over</h2>
+            <p class="text-xl md:text-2xl" id="round-over-commentary"></p>
+            <p class="text-2xl"><span class="player-name" id="player-name-roundover"></span>'s Round Power: <span id="round-score"></span> / 5</p>
+            <p class="text-2xl">Total TRIVIA POWER: <span id="total-score-round-over"></span></p>
+            <button id="next-round-btn" class="btn">Continue the Charade</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="game-over-screen" class="hidden text-center space-y-6">
+            <h2 class="text-4xl md:text-5xl">It's Over.</h2>
+            <p class="text-xl md:text-2xl" id="game-over-message"></p>
+            <p class="text-3xl">Final TRIVIA POWER: <span id="final-score"></span></p>
+            <div class="text-2xl mt-2" id="final-rating"></div>
+            <button id="play-again-btn" class="btn">Suffer Again</button>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM ELEMENTS ---
+        const startScreen = document.getElementById('start-screen');
+        const categoryScreen = document.getElementById('category-screen');
+        const questionScreen = document.getElementById('question-screen');
+        const roundOverScreen = document.getElementById('round-over-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+
+        const startBtn = document.getElementById('start-btn');
+        const nextRoundBtn = document.getElementById('next-round-btn');
+        const playAgainBtn = document.getElementById('play-again-btn');
+
+        const roundNumberEl = document.getElementById('round-number');
+        const categoryCommentaryEl = document.getElementById('category-commentary');
+        const categoryButtonsContainer = document.getElementById('category-buttons');
+        
+        const questionCategoryEl = document.getElementById('question-category');
+        const scoreEl = document.getElementById('score');
+        const questionTextEl = document.getElementById('question-text');
+        const answerButtonsContainer = document.getElementById('answer-buttons');
+        const feedbackTextEl = document.getElementById('feedback-text');
+        const playerNameQuestionEl = document.getElementById('player-name-question');
+        const xpBarInner = document.getElementById('xp-bar-inner');
+
+        const roundScoreEl = document.getElementById('round-score');
+        const totalScoreRoundOverEl = document.getElementById('total-score-round-over');
+        const roundOverCommentaryEl = document.getElementById('round-over-commentary');
+        const playerNameRoundOverEl = document.getElementById('player-name-roundover');
+
+        const finalScoreEl = document.getElementById('final-score');
+        const finalRatingEl = document.getElementById('final-rating');
+        const gameOverMessageEl = document.getElementById('game-over-message');
+
+        const nameInput = document.getElementById('name-input');
+
+        // --- GAME STATE ---
+        let playerName = '';
+        let score = 0;
+        let currentRound = 0;
+        const TOTAL_ROUNDS = 10;
+        const QUESTIONS_PER_ROUND = 5;
+        let currentQuestionIndexInRound = 0;
+        let currentCategory = '';
+        let currentRoundScore = 0;
+        let shuffledQuestions = [];
+        const POINTS_PER_CORRECT = 1000;
+        const INCENTIVE_SCORE = 50000;
+
+        // --- COMMENTARY ---
+        const roundEndCommentaries = [
+            "You got some right. You got some wrong. The universe remains indifferent.",
+            "Consider the information you just processed. Now consider it turning to dust with your brain.",
+            "Another round down. Are you feeling entertained yet? Or just... distracted?",
+            "The illusion of progress is a powerful anesthetic.",
+            "You're building a palace of facts in your head. A palace with no windows, no doors, and a leaky roof.",
+            "That was... a performance. The void applauds politely.",
+            "Remember, every correct answer is just one less thing you have to wonder about before you're forgotten."
+        ];
+
+        const categoryChoiceCommentaries = [
+            "Choose a topic. Pretend it matters which one.",
+            "All paths lead to the same conclusion. But sure, pick one.",
+            "Select your preferred flavor of trivia. It all tastes like oblivion in the end.",
+            "Your choice is a testament to the marketing you've absorbed. Impressive."
+        ];
+        
+        const correctFeedback = ["A correct button press. The gears of the machine turn.", "Fine. One point. Don't spend it all in one place.", "That memory served you well. It will fail you later.", "Correct. A flicker of light in the darkness."];
+        const incorrectFeedback = ["Wrong. As is tradition.", "No. And the universe doesn't care about your attempt.", "Incorrect. Another fact slips through your fingers.", "That was the wrong answer. A perfect metaphor."];
+
+        // --- TRIVIA DATA ---
+        // ... [TRUNCATED for brevity, use your existing questions object here.] ...
+        // Place your existing "questions" object here!
+
+        // --- HELPER FUNCTIONS ---
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function getRandomItem(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+        
+        function showScreen(screen) {
+            startScreen.classList.add('hidden');
+            categoryScreen.classList.add('hidden');
+            questionScreen.classList.add('hidden');
+            roundOverScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            screen.classList.remove('hidden');
+        }
+
+        function updateXPBar() {
+            const percent = Math.min(100, Math.round((score / INCENTIVE_SCORE) * 100));
+            xpBarInner.style.width = percent + '%';
+        }
+
+        // --- GAME LOGIC ---
+        function startGame() {
+            playerName = nameInput.value.trim() || "Player 1";
+            score = 0;
+            currentRound = 0;
+            scoreEl.textContent = score;
+            playerNameQuestionEl.textContent = playerName;
+            playerNameRoundOverEl.textContent = playerName;
+            updateXPBar();
+            startNextRound();
+        }
+
+        function startNextRound() {
+            currentRound++;
+            if (currentRound > TOTAL_ROUNDS) {
+                endGame();
+                return;
+            }
+            currentQuestionIndexInRound = 0;
+            currentRoundScore = 0;
+            roundNumberEl.textContent = currentRound;
+            categoryCommentaryEl.textContent = getRandomItem(categoryChoiceCommentaries);
+            populateCategories();
+            showScreen(categoryScreen);
+        }
+        
+        function populateCategories() {
+            categoryButtonsContainer.innerHTML = '';
+            const categoryNames = Object.keys(questions);
+            categoryNames.forEach(name => {
+                const button = document.createElement('button');
+                button.textContent = name;
+                button.classList.add('btn');
+                button.addEventListener('click', () => selectCategory(name));
+                categoryButtonsContainer.appendChild(button);
+            });
+        }
+
+        function selectCategory(category) {
+            currentCategory = category;
+            const categoryQuestions = [...questions[category]];
+            shuffleArray(categoryQuestions);
+            shuffledQuestions = categoryQuestions.slice(0, QUESTIONS_PER_ROUND);
+            playerNameQuestionEl.textContent = playerName;
+            playerNameRoundOverEl.textContent = playerName;
+            showScreen(questionScreen);
+            displayQuestion();
+        }
+
+        function displayQuestion() {
+            if (currentQuestionIndexInRound >= QUESTIONS_PER_ROUND) {
+                endRound();
+                return;
+            }
+            const questionData = shuffledQuestions[currentQuestionIndexInRound];
+            questionCategoryEl.textContent = `Category: ${currentCategory}`;
+            questionTextEl.textContent = `Q: ${questionData.q}`;
+            answerButtonsContainer.innerHTML = '';
+            feedbackTextEl.textContent = '';
+            
+            const shuffledAnswers = [...questionData.a];
+            shuffleArray(shuffledAnswers);
+
+            shuffledAnswers.forEach(answer => {
+                const button = document.createElement('button');
+                button.textContent = answer;
+                button.classList.add('btn', 'answer-btn');
+                button.addEventListener('click', () => handleAnswer(answer, questionData.c, button));
+                answerButtonsContainer.appendChild(button);
+            });
+        }
+
+        function handleAnswer(selectedAnswer, correctAnswer, button) {
+            const allAnswerButtons = answerButtonsContainer.querySelectorAll('.answer-btn');
+            allAnswerButtons.forEach(btn => btn.disabled = true);
+
+            if (selectedAnswer === correctAnswer) {
+                score += POINTS_PER_CORRECT;
+                currentRoundScore++;
+                scoreEl.textContent = score;
+                button.classList.add('correct');
+                feedbackTextEl.textContent = getRandomItem(correctFeedback);
+            } else {
+                button.classList.add('incorrect');
+                feedbackTextEl.textContent = getRandomItem(incorrectFeedback);
+                // Highlight the correct answer
+                allAnswerButtons.forEach(btn => {
+                    if (btn.textContent === correctAnswer) {
+                        btn.classList.add('correct');
+                    }
+                });
+            }
+            updateXPBar();
+            currentQuestionIndexInRound++;
+            setTimeout(displayQuestion, 2000);
+        }
+        
+        function endRound() {
+            roundScoreEl.textContent = currentRoundScore;
+            totalScoreRoundOverEl.textContent = score;
+            roundOverCommentaryEl.textContent = getRandomItem(roundEndCommentaries);
+            playerNameRoundOverEl.textContent = playerName;
+            if (currentRound === TOTAL_ROUNDS) {
+                nextRoundBtn.textContent = "See Final Verdict";
+            } else {
+                nextRoundBtn.textContent = "Continue the Charade";
+            }
+            showScreen(roundOverScreen);
+        }
+
+        function endGame() {
+            finalScoreEl.textContent = score;
+            playerNameQuestionEl.textContent = playerName;
+            let rating, ratingMsg;
+            if (score >= INCENTIVE_SCORE) {
+                rating = "RETRO MASTER";
+                ratingMsg = "You have transcended. Your Trivia Power is legendary. Bow before the master of the useless!";
+            } else if (score >= 40000) {
+                rating = "FINAL BOSS";
+                ratingMsg = "Your Trivia Power is mighty. Few can match your data-hoarding prowess!";
+            } else if (score >= 25000) {
+                rating = "MID BOSS";
+                ratingMsg = "Solid showing! You are a threat to most, but the true masters remain ahead.";
+            } else if (score >= 10000) {
+                rating = "MINI-BOSS";
+                ratingMsg = "You have some power, but still a ways to go. Try again to ascend!";
+            } else {
+                rating = "TRIVIA SCRUB";
+                ratingMsg = "You did your best. The void thanks you for your service to distraction.";
+            }
+            finalRatingEl.innerHTML = `<span class="font-bold">${rating}</span><br>${ratingMsg}`;
+            gameOverMessageEl.textContent = `${playerName}, the simulation is complete. You've accumulated a score. Does it matter? No. But you did it. Congratulations on wasting a little more of your finite existence.`;
+            showScreen(gameOverScreen);
+        }
+
+        // --- EVENT LISTENERS ---
+        startBtn.addEventListener('click', () => {
+            if (!nameInput.value.trim()) {
+                nameInput.classList.add("ring", "ring-red-500");
+                nameInput.placeholder = "Enter a name first!";
+                return;
+            }
+            nameInput.classList.remove("ring", "ring-red-500");
+            startGame();
+        });
+        nextRoundBtn.addEventListener('click', startNextRound);
+        playAgainBtn.addEventListener('click', () => {
+            nameInput.value = "";
+            showScreen(startScreen);
+        });
+
+        // Allow enter key to start game
+        nameInput.addEventListener("keypress", function(e) {
+            if (e.key === "Enter") startBtn.click();
+        });
+
+        // Focus input on load
+        window.onload = () => {
+            nameInput.focus();
+        };
+    </script>
+</body>
+</html>
